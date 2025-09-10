@@ -1,0 +1,45 @@
+#######################################################################
+# File: configs/alertmanager-nonprod.yml
+#
+# Description:
+#   Non-production AlertManager configuration template with relaxed
+#   thresholds and Slack-only notifications for development environments.
+#
+# Purpose:
+#   Provide cost-optimized alerting configuration for development,
+#   staging, and testing environments.
+#
+# Notes:
+#   - Feature Flag: create_default_rules (default: true)
+#     * When enabled: This template is loaded via templatefile() in locals.tf
+#     * Applied when environment != "production"
+#   - Template Variables:
+#     * ${environment}: Injected for alert labeling (dev/staging/testing)
+#     * ${region}: Used for regional context
+#     * ${slack_webhook_url}: Placeholder for team notification channel
+#   - Non-production settings:
+#     * Relaxed response times: group_wait=30s, repeat_interval=24h
+#     * Slack-only notifications (no PagerDuty)
+#     * Reduced alert frequency for cost optimization
+#     * Simplified routing for development workflows
+#######################################################################
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@company.com'
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 24h
+  receiver: 'default-alerts'
+
+receivers:
+- name: 'default-alerts'
+  slack_configs:
+  - api_url: '${slack_webhook_url}'
+    channel: '#dev-alerts'
+    title: 'Non-Production Alert - ${environment}'
+    text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'

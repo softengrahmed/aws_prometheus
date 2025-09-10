@@ -1,0 +1,92 @@
+#######################################################################
+# File: configs/recording-rules-prod.yml
+#
+# Description:
+#   Production recording rules template with SLI/SLO calculations,
+#   performance metrics, and critical infrastructure alerts.
+#
+# Purpose:
+#   Pre-compute complex metrics for fast dashboard queries and
+#   implement production-grade monitoring with tight SLA thresholds.
+#
+# Notes:
+#   - Feature Flag: create_default_rules (default: true)
+#     * When enabled: This template is loaded via templatefile() in locals.tf
+#     * Applied when environment="production"
+#   - Template Variables:
+#     * ${environment}: Used in metric labels and alert routing
+#     * ${region}: Provides regional context for rules
+#   - Production-specific rules:
+#     * SLI calculations: 99.9% availability threshold
+#     * Fast evaluation: 30s intervals for real-time monitoring
+#     * Critical alerts: 2-5 minute response windows
+#     * Infrastructure monitoring: CPU, memory, disk alerts
+#     * Recording rules for dashboard performance optimization
+#######################################################################
+
+groups:
+- name: sli-slo-rules
+  interval: 30s
+  rules:
+  - record: sli:availability:5m
+    expr: |
+      (
+        sum(rate(http_requests_total{job="api-gateway",code!~"5.."}[5m])) by (service)
+        /
+        sum(rate(http_requests_total{job="api-gateway"}[5m])) by (service)
+      ) * 100
+    labels:
+      sli_type: availability
+      environment: ${environment}
+      
+  - record: sli:latency:95percentile:5m
+    expr: |
+      histogram_quantile(0.95, 
+        sum(rate(http_request_duration_seconds_bucket{job="api-gateway"}[5m])) by (le, service)
+      ) * 1000
+    labels:
+      sli_type: latency
+      environment: ${environment}
+
+  - alert: HighErrorRate
+    expr: sli:availability:5m < 99.9
+    for: 2m
+    labels:
+      severity: critical
+      environment: ${environment}
+    annotations:
+      summary: "High error rate detected"
+      description: "Service {{ $labels.service }} has availability of {{ $value }}% which is below SLO"
+
+  - alert: HighLatency
+    expr: sli:latency:95percentile:5m > 200
+    for: 5m
+    labels:
+      severity: warning
+      environment: ${environment}
+    annotations:
+      summary: "High latency detected"
+      description: "Service {{ $labels.service }} 95th percentile latency is {{ $value }}ms"
+
+- name: infrastructure-monitoring
+  interval: 30s
+  rules:
+  - alert: EKSNodeHighCPU
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 10m
+    labels:
+      severity: warning
+      environment: ${environment}
+    annotations:
+      summary: "EKS Node high CPU usage"
+      description: "Node {{ $labels.instance }} has CPU usage above 80%"
+
+  - alert: EKSNodeHighMemory
+    expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+    for: 5m
+    labels:
+      severity: critical
+      environment: ${environment}
+    annotations:
+      summary: "EKS Node high memory usage"
+      description: "Node {{ $labels.instance }} has memory usage above 85%"

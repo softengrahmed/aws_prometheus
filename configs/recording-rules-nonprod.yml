@@ -1,0 +1,60 @@
+#######################################################################
+# File: configs/recording-rules-nonprod.yml
+#
+# Description:
+#   Non-production recording rules template with relaxed thresholds
+#   and basic monitoring for development environments.
+#
+# Purpose:
+#   Provide cost-effective monitoring with essential alerts and
+#   simplified metrics for development and testing workflows.
+#
+# Notes:
+#   - Feature Flag: create_default_rules (default: true)
+#     * When enabled: This template is loaded via templatefile() in locals.tf
+#     * Applied when environment != "production"
+#   - Template Variables:
+#     * ${environment}: Used for dev/staging/testing context
+#     * ${region}: Regional identification for rules
+#   - Non-production settings:
+#     * Relaxed thresholds: 95% availability vs 99.9% in production
+#     * Slower evaluation: 60s intervals for cost optimization
+#     * Extended alert windows: 10-15 minutes before firing
+#     * Basic infrastructure monitoring only
+#     * Simplified recording rules for essential metrics
+#######################################################################
+
+groups:
+- name: basic-monitoring
+  interval: 60s
+  rules:
+  - record: dev:availability:5m
+    expr: |
+      (
+        sum(rate(http_requests_total{job="api-gateway",code!~"5.."}[5m])) by (service)
+        /
+        sum(rate(http_requests_total{job="api-gateway"}[5m])) by (service)
+      ) * 100
+    labels:
+      sli_type: availability
+      environment: ${environment}
+
+  - alert: DevEnvironmentDown
+    expr: up{environment="${environment}"} == 0
+    for: 15m
+    labels:
+      severity: info
+      environment: ${environment}
+    annotations:
+      summary: "Development service is down"
+      description: "Service {{ $labels.job }} in ${environment} environment is down"
+
+  - alert: NonProdHighErrorRate
+    expr: dev:availability:5m < 95
+    for: 10m
+    labels:
+      severity: warning
+      environment: ${environment}
+    annotations:
+      summary: "Non-production environment high error rate"
+      description: "Service {{ $labels.service }} has availability of {{ $value }}%"
