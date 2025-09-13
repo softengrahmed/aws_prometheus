@@ -164,3 +164,10 @@ variable "deletion_window_in_days" {
   default     = "7"
 }
 
+variable "logging_configuration" {
+  description = "Logging configuration for the workspace"
+  type = object({
+    log_group_arn = optional(string)
+  })
+  default = {}
+}

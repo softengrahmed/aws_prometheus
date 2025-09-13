@@ -20,6 +20,9 @@
 #     * Enables automated SLI/SLO calculations
 #   - Conditional behavior: Resources only deploy when both feature flag
 #     is enabled AND configuration content exists
+#   - Feature Flag: logging_configuration.log_group_arn
+#     * When null: Creates new CloudWatch log group for AMP logs
+#     * When provided: Uses existing log group for operational logging
 #######################################################################
 
 # Prometheus workspace
@@ -27,6 +30,13 @@ resource "aws_prometheus_workspace" "main" {
   alias       = var.workspace_alias
   kms_key_arn = aws_kms_key.jnj_amp.arn
 
+  dynamic "logging_configuration" {
+    for_each = var.logging_configuration.log_group_arn != null ? [1] : []
+    content {
+      log_group_arn = var.logging_configuration.log_group_arn
+    }
+  }
+  
   tags = merge(local.common_tags, {
     Name = var.workspace_alias
   })
