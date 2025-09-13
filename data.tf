@@ -10,11 +10,6 @@
 #   trust relationships and cross-service integration.
 #
 # Notes:
-#   - No direct feature flags, but supports IRSA functionality
-#   - EKS cluster data source loops through var.eks_cluster_names list
-#   - OIDC issuer URLs extracted for each EKS cluster for IRSA trust policies
-#   - When eks_cluster_names is empty: No EKS integration configured
-#   - When eks_cluster_names populated: Enables ADOT collector IAM roles
 #   - Supports multi-cluster environments with unique OIDC per cluster
 #   - Current account, region, and partition data used throughout module
 #######################################################################

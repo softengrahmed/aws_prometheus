@@ -15,8 +15,8 @@
 #     * Selects environment-specific templates (prod vs nonprod)
 #     * When disabled: Uses empty configuration strings
 #   - Feature Flag Logic: environment-based template selection
-#     * Production: Uses configs/alertmanager-prod.yml and recording-rules-prod.yml
-#     * Non-production: Uses configs/alertmanager-nonprod.yml and recording-rules-nonprod.yml
+#     * Production: Uses configs/alertmanager-prod.yml.tpl and recording-rules-prod.yml.tpl
+#     * Non-production: Uses configs/alertmanager-nonprod.yml.tpl and recording-rules-nonprod.yml.tpl
 #   - Cross-account principal generation based on allowed_source_accounts list
 #   - Dynamic role naming with workspace alias for uniqueness
 #   - Template variable substitution for environment and region context
@@ -27,50 +27,47 @@ locals {
   # Common tags applied to all resources
   common_tags = merge(
     {
-      Environment        = var.environment
-      Service           = "prometheus"
-      ManagedBy         = "terraform"
-      Module            = "amp-module"
-      WorkspaceAlias    = var.workspace_alias
-      RetentionDays     = var.retention_period_days
-      ScrapeInterval    = var.scrape_interval
-      HighAvailability  = var.enable_high_availability
+      Environment      = var.environment
+      Service          = "prometheus"
+      ManagedBy        = "terraform"
+      Module           = "amp-module"
+      WorkspaceAlias   = var.workspace_alias
+      ScrapeInterval   = var.scrape_interval
+      HighAvailability = var.enable_high_availability
     },
     var.tags
   )
 
   # Current region if not provided
-  current_region = var.region != "" ? var.region : data.aws_region.current.name
+  current_region = var.region
+}
+
+
+locals {
+
+  # Template variables for AlertManager configuration
+  alertmanager_template_vars = {
+    environment           = var.environment
+    region                = local.current_region
+    slack_webhook_url     = var.slack_webhook_url
+    pagerduty_service_key = var.pagerduty_service_key
+    notification_email    = var.notification_email
+    smtp_server           = var.smtp_server
+    workspace_alias       = var.workspace_alias
+    scrape_interval       = var.scrape_interval
+    smtp_username         = var.smtp_username
+    smtp_password         = var.smtp_password
+    teams_webhook_url     = var.teams_webhook_url
+  }
 
   # Default alert manager configuration
-  default_alertmanager_config = var.environment == "production" ? templatefile("${path.module}/configs/alertmanager-prod.yml", {
-    environment = var.environment
-    region      = local.current_region
-  }) : templatefile("${path.module}/configs/alertmanager-nonprod.yml", {
-    environment = var.environment
-    region      = local.current_region
-  })
+  default_alertmanager_config = var.environment == "production" ? templatefile("${path.module}/configs/alertmanager-prod.yml.tpl", local.alertmanager_template_vars) : templatefile("${path.module}/configs/alertmanager-nonprod.yml.tpl", local.alertmanager_template_vars)
 
-  # Default recording rules configuration
-  default_recording_rules_config = var.environment == "production" ? templatefile("${path.module}/configs/recording-rules-prod.yml", {
-    environment = var.environment
-    region      = local.current_region
-  }) : templatefile("${path.module}/configs/recording-rules-nonprod.yml", {
-    environment = var.environment
-    region      = local.current_region
-  })
+  # Default recording rule configuration
+  default_recording_rules_config = var.environment == "production" ? templatefile("${path.module}/configs/recording-rules-prod.yml.tpl", local.alertmanager_template_vars) : templatefile("${path.module}/configs/recording-rules-nonprod.yml.tpl", local.alertmanager_template_vars)
 
-  # Final configurations
-  final_alertmanager_config = var.alertmanager_config != "" ? var.alertmanager_config : (var.create_default_rules ? local.default_alertmanager_config : "")
+  final_alertmanager_config    = var.alertmanager_config != "" ? var.alertmanager_config : (var.create_default_rules ? local.default_alertmanager_config : "")
   final_recording_rules_config = var.recording_rules_config != "" ? var.recording_rules_config : (var.create_default_rules ? local.default_recording_rules_config : "")
 
-  # IAM role names
-  workspace_role_name = "AMP-${var.workspace_alias}-ServiceRole"
-  collector_role_name = "AMP-${var.workspace_alias}-CollectorRole"
-  
-  # Cross-account access principals
-  cross_account_principals = [
-    for account_id in var.allowed_source_accounts :
-    "arn:aws:iam::${account_id}:root"
-  ]
 }
+

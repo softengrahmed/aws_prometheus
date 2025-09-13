@@ -18,25 +18,14 @@
 #     * When enabled: Deploys aws_prometheus_rule_group_namespace
 #     * Creates pre-computed metrics for faster dashboard queries
 #     * Enables automated SLI/SLO calculations
-#   - Feature Flag: logging_configuration.log_group_arn
-#     * When null: Creates new CloudWatch log group for AMP logs
-#     * When provided: Uses existing log group for operational logging
 #   - Conditional behavior: Resources only deploy when both feature flag
 #     is enabled AND configuration content exists
 #######################################################################
 
 # Prometheus workspace
 resource "aws_prometheus_workspace" "main" {
-  alias = var.workspace_alias
-  
-  kms_key_id = var.kms_key_id
-
-  dynamic "logging_configuration" {
-    for_each = var.logging_configuration.log_group_arn != null ? [1] : []
-    content {
-      log_group_arn = var.logging_configuration.log_group_arn
-    }
-  }
+  alias       = var.workspace_alias
+  kms_key_arn = aws_kms_key.jnj_amp.arn
 
   tags = merge(local.common_tags, {
     Name = var.workspace_alias
@@ -46,7 +35,7 @@ resource "aws_prometheus_workspace" "main" {
 # Alert Manager configuration
 resource "aws_prometheus_alert_manager_definition" "main" {
   count = var.enable_alertmanager && local.final_alertmanager_config != "" ? 1 : 0
-  
+
   workspace_id = aws_prometheus_workspace.main.id
   definition   = local.final_alertmanager_config
 
@@ -56,23 +45,11 @@ resource "aws_prometheus_alert_manager_definition" "main" {
 # Recording rules configuration  
 resource "aws_prometheus_rule_group_namespace" "main" {
   count = var.enable_recording_rules && local.final_recording_rules_config != "" ? 1 : 0
-  
+
   workspace_id = aws_prometheus_workspace.main.id
-  namespace    = "${var.environment}-rules"
-  data         = local.final_recording_rules_config
+  name         = "${var.environment}-rules"
+  data         = local.default_recording_rules_config
 
   depends_on = [aws_prometheus_workspace.main]
 }
 
-# CloudWatch log group for Prometheus (if logging enabled)
-resource "aws_cloudwatch_log_group" "prometheus_logs" {
-  count = var.logging_configuration.log_group_arn == null ? 1 : 0
-  
-  name              = "/aws/prometheus/${var.workspace_alias}"
-  retention_in_days = var.environment == "production" ? 30 : 7
-
-  tags = merge(local.common_tags, {
-    Name = "/aws/prometheus/${var.workspace_alias}"
-    Type = "PrometheusLogs"
-  })
-}

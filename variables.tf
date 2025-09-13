@@ -16,9 +16,6 @@
 #   - Feature Flag: enable_recording_rules (bool, default: true)
 #     * Controls deployment of recording rules namespace
 #     * When disabled: No pre-computed metrics, results in  slower queries
-#   - Feature Flag: enable_cross_region_access (bool, default: false)
-#     * When enabled: Creates cross-account IAM policies
-#     * Allows multi-region or multi-account workspace access
 #   - Feature Flag: enable_high_availability (bool, default: false)
 #     * When enabled: Configures HA settings and resource sizing
 #     * Affects tagging and operational configurations
@@ -51,27 +48,13 @@ variable "environment" {
 variable "region" {
   description = "AWS region for the Prometheus workspace"
   type        = string
-  default     = ""
+  default     = "eu-west-1"
 }
 
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)
   default     = {}
-}
-
-variable "kms_key_id" {
-  description = "KMS key ID for encryption (optional)"
-  type        = string
-  default     = null
-}
-
-variable "logging_configuration" {
-  description = "Logging configuration for the workspace"
-  type = object({
-    log_group_arn = optional(string)
-  })
-  default = {}
 }
 
 variable "enable_alertmanager" {
@@ -110,27 +93,7 @@ variable "eks_cluster_names" {
   default     = []
 }
 
-variable "enable_cross_region_access" {
-  description = "Enable cross-region access for the workspace"
-  type        = bool
-  default     = false
-}
 
-variable "allowed_source_accounts" {
-  description = "List of AWS account IDs allowed to write to this workspace"
-  type        = list(string)
-  default     = []
-}
-
-variable "retention_period_days" {
-  description = "Data retention period in days (only used for tagging/documentation)"
-  type        = number
-  default     = 150
-  validation {
-    condition     = var.retention_period_days >= 1 && var.retention_period_days <= 450
-    error_message = "Retention period must be between 1 and 450 days."
-  }
-}
 
 variable "scrape_interval" {
   description = "Default scrape interval for metrics collection"
@@ -147,3 +110,57 @@ variable "enable_high_availability" {
   type        = bool
   default     = false
 }
+
+# alert-manager template variables
+variable "slack_webhook_url" {
+  description = "Slack webhook URL for alert notifications"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "pagerduty_service_key" {
+  description = "PagerDuty service integration key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "notification_email" {
+  description = "Email address for alert notifications"
+  type        = string
+  default     = "alerts@company.com"
+}
+
+variable "smtp_server" {
+  description = "SMTP server for email notifications"
+  type        = string
+  default     = "localhost:587"
+}
+
+variable "smtp_username" {
+  description = "User name for smtp"
+  type        = string
+  default     = "admin"
+}
+
+
+variable "teams_webhook_url" {
+  description = "webhook url"
+  type        = string
+  default     = "https://localhost"
+}
+
+variable "smtp_password" {
+  description = "User name for smtp"
+  type        = string
+  default     = "@!@!@!"
+  sensitive   = true
+}
+
+variable "deletion_window_in_days" {
+  description = "kms rotation window"
+  type        = number
+  default     = "7"
+}
+
