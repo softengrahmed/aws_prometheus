@@ -45,6 +45,13 @@ locals {
 
 locals {
 
+  # Determine SMTP password source - prioritize KMS-encrypted over plain text
+  smtp_password_final = var.smtp_password_encrypted != "" ? (
+    length(data.aws_kms_secrets.smtp_credentials) > 0 ?
+    data.aws_kms_secrets.smtp_credentials[0].plaintext["smtp_password"] :
+    ""
+  ) : var.smtp_password
+
   # Template variables for AlertManager configuration
   alertmanager_template_vars = {
     environment           = var.environment
@@ -56,9 +63,12 @@ locals {
     workspace_alias       = var.workspace_alias
     scrape_interval       = var.scrape_interval
     smtp_username         = var.smtp_username
-    smtp_password         = var.smtp_password
+    smtp_password         = local.smtp_password_final # Use KMS-decrypted password
     teams_webhook_url     = var.teams_webhook_url
   }
+
+  # Validation check - ensure we have an SMTP password from either source
+  smtp_password_configured = local.smtp_password_final != ""
 
   # Default alert manager configuration
   default_alertmanager_config = var.environment == "production" ? templatefile("${path.module}/configs/alertmanager-prod.yml.tpl", local.alertmanager_template_vars) : templatefile("${path.module}/configs/alertmanager-nonprod.yml.tpl", local.alertmanager_template_vars)
@@ -71,3 +81,15 @@ locals {
 
 }
 
+# Add validation to ensure SMTP is properly configured
+resource "null_resource" "smtp_validation" {
+  count = var.enable_alertmanager && var.smtp_username != "" && !local.smtp_password_configured ? 1 : 0
+
+  triggers = {
+    error = "SMTP username is configured but no password is available. Please provide either smtp_password or smtp_password_encrypted."
+  }
+
+  provisioner "local-exec" {
+    command = "echo 'ERROR: ${null_resource.smtp_validation[0].triggers.error}' && exit 1"
+  }
+}

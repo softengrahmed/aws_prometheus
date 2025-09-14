@@ -151,13 +151,6 @@ variable "teams_webhook_url" {
   default     = "https://localhost"
 }
 
-variable "smtp_password" {
-  description = "User name for smtp"
-  type        = string
-  default     = "@!@!@!"
-  sensitive   = true
-}
-
 variable "deletion_window_in_days" {
   description = "kms rotation window"
   type        = number
@@ -170,4 +163,32 @@ variable "logging_configuration" {
     log_group_arn = optional(string)
   })
   default = {}
+}
+
+# DEPRECATED: Plain text SMTP password (use smtp_password_encrypted instead)
+variable "smtp_password" {
+  description = "DEPRECATED: Plain text SMTP password. Use smtp_password_encrypted instead for security."
+  type        = string
+  default     = ""
+  sensitive   = true
+
+  validation {
+    condition     = var.smtp_password == "" || var.smtp_password_encrypted == ""
+    error_message = "Cannot specify both smtp_password and smtp_password_encrypted. Use only smtp_password_encrypted for secure password storage."
+  }
+}
+
+# New secure variable for KMS-encrypted SMTP password
+variable "smtp_password_encrypted" {
+  description = "KMS-encrypted SMTP password as base64-encoded ciphertext blob. Use AWS CLI to encrypt: aws kms encrypt --key-id alias/prometheus-smtp-<env>-<workspace> --plaintext 'your-password' --output text --query CiphertextBlob"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# KMS key ID for SMTP password encryption (optional - uses module-created key by default)
+variable "smtp_kms_key_id" {
+  description = "Optional: KMS key ID to use for SMTP password decryption. If not provided, uses the key created by this module."
+  type        = string
+  default     = ""
 }

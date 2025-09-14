@@ -64,3 +64,19 @@ output "query_url" {
   description = "Query URL for the Prometheus workspace"
   value       = "${aws_prometheus_workspace.main.prometheus_endpoint}api/v1/query"
 }
+
+# SMTP KMS key information
+output "smtp_kms_key_id" {
+  description = "KMS key ID for SMTP password encryption"
+  value       = aws_kms_key.smtp_credentials.key_id
+}
+
+output "smtp_kms_key_arn" {
+  description = "KMS key ARN for SMTP password encryption"
+  value       = aws_kms_key.smtp_credentials.arn
+}
+
+output "smtp_kms_key_alias" {
+  description = "KMS key alias for SMTP password encryption"
+  value       = aws_kms_alias.smtp_credentials.name
+}

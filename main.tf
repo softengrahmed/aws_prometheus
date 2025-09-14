@@ -36,7 +36,7 @@ resource "aws_prometheus_workspace" "main" {
       log_group_arn = var.logging_configuration.log_group_arn
     }
   }
-  
+
   tags = merge(local.common_tags, {
     Name = var.workspace_alias
   })
